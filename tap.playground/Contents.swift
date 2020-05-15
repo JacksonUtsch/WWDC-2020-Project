@@ -60,6 +60,7 @@ struct LoaderView: View {
                             .fontWeight(.light)
                             .foregroundColor(Color(Game.Color.darkBlue))
                         Text("highscore: \(highscore)")
+                            .foregroundColor(Color(UIColor(red:0.48, green:0.57, blue:0.61, alpha:1.00)))
 
                     }.frame(width: 300, height: 0, alignment: .leading)
                                         
@@ -155,6 +156,7 @@ struct GameStack: View {
         observedObject.reset()
         for case let child as GameObject in gameView.scene.children {
             child.removeFromParent()
+            child.destroy()
         }
     }
 }

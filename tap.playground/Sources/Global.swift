@@ -9,6 +9,30 @@
 import SwiftUI
 import SpriteKit
 
+// accounts for game variables
+public class Coordinator: ObservableObject {
+    @Published public var objectCount: Int = 0
+    @Published public var lives: String = "|||"
+    @Published public var objectsKey: [Int] = Array(0...(Game.objectCount() - 1)).shuffled()
+    @Published public var showingBoard: Bool = false
+    
+    // weird playgrounds requirement to compile
+    public init() {
+        
+    }
+    
+    public func reset() {
+        objectCount = 0
+        lives = "|||"
+        showingBoard = false
+    }
+    
+    public func newKey() {
+        print("game key reset.")
+        objectsKey = Array(0...(Game.objectCount() - 1)).shuffled()
+    }
+}
+
 // Game constants
 public enum Game {
     
@@ -38,7 +62,7 @@ extension Game {
         var objects: [GameObject] = []
         
         for aspect in (0...Game.objectCount() - 1) {
-            let object = GameObject(active: false, objectIndex: aspect)
+            let object = GameObject(active: false, objectIndex: aspect, objRef: nil)
             objects.append(object)
         }
         

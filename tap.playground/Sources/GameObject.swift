@@ -8,33 +8,30 @@
 
 import SpriteKit
 
+public protocol GameObjectDelegate {
+    func gameOver()
+}
+
 public class GameObject: SKShapeNode {
-    private let radius: CGFloat = 50
-    private var objectIndex: Int
-    public var touchesRemain: Int
+    var object: Coordinator?
+    public var delegate: GameObjectDelegate?
     
+    public var touchesRemain: Int
+    public var objectIndex: Int
+    private var decayNode: SKShapeNode
+    private var timer: Timer?
+    
+    private let radius: CGFloat = 50
     private let initialTime:CGFloat = 3
     private var time: CGFloat = 3
-    private var timer: Timer?
-    private var decayNode: SKShapeNode
     
-    public init(active: Bool, objectIndex: Int) {
+    public init(active: Bool, objectIndex: Int, objRef: Coordinator?) {
         self.objectIndex = objectIndex
         self.touchesRemain = objectIndex
-        
-//        if active == true {
-//            var value = 0 + 1
-//            for i in gameStack.observedObject.objectsKey.enumerated() {
-//                if i.offset == objectIndex {
-//                    value = i.element + 1
-//                }
-//            }
-//            self.touchesRemain = value
-//        }
-        
+        self.object = objRef
+                
         decayNode = SKShapeNode(circleOfRadius: radius)
         decayNode.lineWidth = 0
-        
         super.init()
         path = UIBezierPath(roundedRect: CGRect(x: -radius, y: -radius, width: radius*2, height: radius*2), cornerRadius: radius).cgPath
         position = CGPoint(x: radius, y: radius)
@@ -60,6 +57,14 @@ public class GameObject: SKShapeNode {
         
         if time <= 0 {
             destroy()
+            if object != nil {
+                if object!.lives.count >= 1 {
+                    object!.lives.removeFirst()
+                    if object!.lives == "" {
+                        delegate!.gameOver()
+                    }
+                }
+            }
             return
         }
         

@@ -2,23 +2,36 @@ import PlaygroundSupport
 import SwiftUI
 import SpriteKit
 
-let defaults = UserDefaults.standard
+/// to fix playground bug
+var ranOnce = false
+let coordinator = Coordinator()
 
-let key = "highscore"
+let defaults = UserDefaults.standard
+let highscoreKey = "highscore"
 var highscore: Int = {
-    let value = defaults.value(forKey: key) as? String // Any?
+    let value = defaults.value(forKey: highscoreKey) as? String
     guard value != nil else {
         return 0
     }
     return Int(value!)!
 }()
 
-public var objectCount: Int = 0
-public var lives = "|||"
-
+/// menu of app, sets up game key
 struct LoaderView: View {
     
     var key: [Int: Int] = [:]
+        
+    init() {
+        print(
+            """
+            Thanks for checking out this playground
+            I hope the interactive game is at least a little fun and challenging
+
+            Try to remember to number associated with each colored circle
+            It'll help you after you press start
+
+            """)
+    }
     
     var body: some View {
         
@@ -62,7 +75,7 @@ struct LoaderView: View {
                         Image(uiImage: Game.renderImage(from: Game.objects()[i])!)
                             .resizable()
                             .frame(width: 90, height: 90, alignment: .center)
-                        Text("\(i)")//String(self.key[i] + 1))
+                        Text(String(coordinator.objectsKey[i] + 1))
                             .foregroundColor(Color(Game.Color.white))
                             .font(.title)
                     }
@@ -70,13 +83,14 @@ struct LoaderView: View {
                 
                 Spacer()
 
-                NavigationLink(destination: GameStack().navigationBarTitle("").navigationBarHidden(true)) {
+                NavigationLink(destination: gameStack.navigationBarTitle("").navigationBarHidden(true)) {
                     Text("Start")
                         .foregroundColor(Color(Game.Color.green))
                         .font(.largeTitle)
                         .padding(15)
                 }.simultaneousGesture(TapGesture().onEnded({
-//                    gameStack.reset()
+                    gameStack.reset()
+                    gameStack.gameView.scene.startSpawns()
                 }))
                 
             }
@@ -87,21 +101,16 @@ struct LoaderView: View {
     }
 }
 
-//let gameStack = GameStack()
+let gameStack = GameStack()
 
+/// layered game stack
 struct GameStack: View {
 
-    @ObservedObject var observedObject = ObservableVariables()
+    @ObservedObject var observedObject: Coordinator = coordinator
     
-    @ObservedObject var showing: Coordinator = coordinator
-
     var gameView = GameView() // declaration required outside body scope to not reset with SwiftUI.
     var gameBoard = GameBoard()
-    
-    init() {
-        reset()
-    }
-    
+        
     var body: some View {
         NavigationView {
             ZStack {
@@ -112,7 +121,7 @@ struct GameStack: View {
                     HStack {
                         
                         VStack {
-                            Text("count")//String(observedObject.objectCount))
+                            Text(String(observedObject.objectCount))
                                 .foregroundColor(Color(Game.Color.green))
                                 .bold()
                                 .fontWeight(.heavy)
@@ -122,7 +131,7 @@ struct GameStack: View {
                         Spacer()
                         
                         VStack {
-                            Text("lives")//String(observedObject.lives))
+                            Text(String(observedObject.lives))
                                 .foregroundColor(Color(Game.Color.green))
                                 .bold()
                                 .fontWeight(.heavy)
@@ -133,21 +142,9 @@ struct GameStack: View {
                     Spacer()
                 }.padding()
                 
-//                if observedObject.showingBoard {
-//                    gameBoard.opacity(1)
-//                } else {
-//                    gameBoard.opacity(0)
-//                }
-//                if lives == "" {
-                if showing.showing {
+                if observedObject.showingBoard {
                     GameBoard()
                 }
-//                }
-//                if observedObject.showingBoard {
-//                    HStack {
-//                        gameBoard
-//                    }//.navigationBarTitle("").navigationBarHidden(true)
-//                }
             }
             .navigationBarTitle("")
             .navigationBarHidden(true)
@@ -155,26 +152,10 @@ struct GameStack: View {
     }
     
     func reset() {
-//        observedObject.showingBoard = false
-//        observedObject.objectCount = 0
-//        observedObject.lives = "|||"
-        gameView.scene.removeAllChildren()
-        gameView.scene.startSpawns()
-    }
-}
-
-// accounts for game variables
-class ObservableVariables: ObservableObject {
-    @Published var objectCount: Int
-    @Published var lives: String
-    @Published var objectsKey: [Int]
-    @Published var showingBoard: Bool
-    
-    init() {
-        objectCount = 0
-        lives = "|||"
-        objectsKey = []
-        showingBoard = false
+        observedObject.reset()
+        for case let child as GameObject in gameView.scene.children {
+            child.removeFromParent()
+        }
     }
 }
 
@@ -197,27 +178,20 @@ struct GameView: UIViewRepresentable {
     
     func updateUIView(_ view: SKView, context: Context) {
         view.presentScene(scene)
-        view.showsNodeCount = true
-        view.showsFPS = true
+        
+        // uncomment to show scene details
+//        view.showsNodeCount = true
+//        view.showsFPS = true
     }
 }
 
-let coordinator = Coordinator()
-
-class Coordinator: ObservableObject {
-    @Published var showing: Bool
+class GameScene: SKScene, ObservableObject, GameObjectDelegate {
     
-    init() {
-        showing = false
-    }
-}
+    @ObservedObject var observedObject: Coordinator = coordinator
 
-class GameScene: SKScene, ObservableObject {
-    
     var spawnTimer: Timer?
     var active: Bool = false
-//    var localCoor: Coordinator = coordinator
-        
+
     override init(size: CGSize) {
         super.init(size: size)
         backgroundColor = Game.Color.white
@@ -228,33 +202,46 @@ class GameScene: SKScene, ObservableObject {
     }
     
     func startSpawns() {
-        print("startSpawns")
+        print("starting spawns")
         active = true
-        spawnTimer = Timer.scheduledTimer(timeInterval: 0.5, target: self, selector: #selector(self.spawnTimed), userInfo: nil, repeats: true)
+        spawnTimer = Timer.scheduledTimer(timeInterval: 0.75, target: self, selector: #selector(self.spawnTimed), userInfo: nil, repeats: true)
     }
     
     @objc func spawnTimed() {
         if self.frame.width > 0 {
             let radius: CGFloat = 50
-            let node = GameObject(active: true, objectIndex: Int.random(in: 0...(Game.objectCount() - 1)))
-            print(self.frame)
+            let node = GameObject(active: true, objectIndex: Int.random(in: 0...(Game.objectCount() - 1)), objRef: coordinator)
+            node.delegate = self
             let posx = CGFloat.random(in: 0...((self.frame.width) - radius))
             let posy = CGFloat.random(in: 0...((self.frame.height) - radius))
             node.position = CGPoint(x: posx, y: posy)
+            
+            if active == true {
+                var value = 0 + 1
+                for i in observedObject.objectsKey.enumerated() {
+                    if i.offset == node.objectIndex {
+                        value = i.element + 1
+                    }
+                }
+                node.touchesRemain = value
+            }
+
             addChild(node)
         }
     }
     
     func gameOver() {
+        print("you scored \(coordinator.objectCount)")
+        print("game over\n")
         active = false
+        ranOnce = true
         spawnTimer?.invalidate()
         spawnTimer = nil
-        if objectCount > highscore {
-            defaults.set("\(objectCount)", forKey: key)
-            highscore = objectCount
+        if observedObject.objectCount > highscore {
+            defaults.set("\(observedObject.objectCount)", forKey: highscoreKey)
+            highscore = observedObject.objectCount
         }
-        coordinator.showing = true
-        //        gameStack.observedObject.showingBoard = true
+        gameStack.observedObject.showingBoard = true
     }
     
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -263,8 +250,12 @@ class GameScene: SKScene, ObservableObject {
             return
         }
         let touch = touches.first
-        let touchPosition = touch!.location(in: self)
-        print("touch: \(touchPosition)")
+        var touchPosition = touch!.location(in: self)
+        
+        // playgrounds bug temp fix, works w/o in .xcodeproj
+        if ranOnce {
+            touchPosition.y += 170
+        }
 
         var touched = false
         for case let object as GameObject in nodes(at: touchPosition) {
@@ -272,14 +263,14 @@ class GameScene: SKScene, ObservableObject {
             object.touchesRemain -= 1
             if object.touchesRemain <= 0 {
                 object.destroy()
-                objectCount += 1
+                observedObject.objectCount += 1
             }
         }
         
         if touched == false {
-            if lives.count >= 1 {
-                lives.removeFirst()
-                if lives == "" {
+            if observedObject.lives.count >= 1 {
+                observedObject.lives.removeFirst()
+                if observedObject.lives == "" {
                     gameOver()
                 }
             }
@@ -287,6 +278,7 @@ class GameScene: SKScene, ObservableObject {
     }
 }
 
+/// game over menu
 struct GameBoard : View {
         
     var body: some View {
@@ -301,17 +293,19 @@ struct GameBoard : View {
                     .foregroundColor(Color(Game.Color.white))
                     .padding(10)
                 
-                Text("Score: \(objectCount)")
+                Text("Score: \(gameStack.observedObject.objectCount)")
                     .foregroundColor(Color(Game.Color.white))
                 
                 Spacer()
                 
                 HStack {
-                    NavigationLink(destination: LoaderView().navigationBarTitle("").navigationBarHidden(true)) {
+                    NavigationLink(destination: loaderView.navigationBarTitle("").navigationBarHidden(true)) {
                         Text("Retry")
                             .padding(10)
                             .foregroundColor(Color(Game.Color.white))
-                    }
+                    }.simultaneousGesture(TapGesture().onEnded({
+                        gameStack.observedObject.newKey()
+                    }))
                 }
                 
                 RoundedRectangle(cornerRadius: 5).foregroundColor(Color(Game.Color.blue))
@@ -325,4 +319,5 @@ struct GameBoard : View {
     }
 }
 
-PlaygroundPage.current.setLiveView(LoaderView())
+let loaderView = LoaderView()
+PlaygroundPage.current.setLiveView(loaderView)

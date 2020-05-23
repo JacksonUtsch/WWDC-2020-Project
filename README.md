@@ -1,4 +1,4 @@
 WWDC
 
-![Alt text](relative/path/to/img1.jpg?raw=true "Title")
-![Alt text](relative/path/to/img2.jpg?raw=true "Title")
+![alt text](img1.jpg)
+![alt text](img2.jpg)
